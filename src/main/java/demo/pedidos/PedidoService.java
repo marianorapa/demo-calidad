@@ -9,6 +9,30 @@ import java.util.Locale;
  */
 public class PedidoService {
 
+    // Límite fijo: hoy no hay plan B si un cliente necesita más unidades.
+    private static final int LIMITE_UNIDADES = 50;
+
+    private static final int CLIENTE_REGULAR = 1;
+    private static final int CLIENTE_PREMIUM = 2;
+    private static final int CLIENTE_MAYORISTA = 3;
+
+    private static final double DESCUENTO_PREMIUM = 0.10;
+    private static final double DESCUENTO_MAYORISTA = 0.20;
+
+    private static final double UMBRAL_DESCUENTO_POR_MONTO = 10000;
+    private static final double DESCUENTO_POR_MONTO = 0.05;
+
+    private static final double DESCUENTO_CUPON_PROMO10 = 0.10;
+    private static final double DESCUENTO_CUPON_BIENVENIDA = 500;
+
+    private static final double UMBRAL_ENVIO_GRATIS = 20000;
+    private static final double ENVIO_CABA = 500;
+    private static final double ENVIO_BUENOS_AIRES = 800;
+    private static final double ENVIO_RESTO_DEL_PAIS = 1500;
+    private static final double RECARGO_EXPRESS = 1000;
+
+    private static final double FACTOR_IVA = 1.21;
+
     private final RepositorioPedidos repositorio;
     private final NotificadorEmail notificador;
 
@@ -33,10 +57,11 @@ public class PedidoService {
                     unidades = unidades + it.cantidad();
                 }
                 if (!hayCantidadInvalida) {
-                    if (unidades > 50) {
-                        throw new IllegalStateException("Límite de 50 unidades por pedido");
+                    if (unidades > LIMITE_UNIDADES) {
+                        throw new IllegalStateException("Límite de " + LIMITE_UNIDADES + " unidades por pedido");
                     }
-                    if (tipoCliente != 1 && tipoCliente != 2 && tipoCliente != 3) {
+                    if (tipoCliente != CLIENTE_REGULAR && tipoCliente != CLIENTE_PREMIUM
+                            && tipoCliente != CLIENTE_MAYORISTA) {
                         throw new IllegalArgumentException("Tipo de cliente desconocido");
                     }
 
@@ -48,24 +73,24 @@ public class PedidoService {
 
                     // descuento por tipo de cliente
                     double base = subtotal;
-                    if (tipoCliente == 1) {
+                    if (tipoCliente == CLIENTE_REGULAR) {
                         base = subtotal;
-                    } else if (tipoCliente == 2) {
-                        base = subtotal - subtotal * 0.10;
+                    } else if (tipoCliente == CLIENTE_PREMIUM) {
+                        base = subtotal - subtotal * DESCUENTO_PREMIUM;
                     } else {
-                        base = subtotal - subtotal * 0.20;
+                        base = subtotal - subtotal * DESCUENTO_MAYORISTA;
                     }
                     // descuento por monto
-                    if (base > 10000) {
-                        base = base - base * 0.05;
+                    if (base > UMBRAL_DESCUENTO_POR_MONTO) {
+                        base = base - base * DESCUENTO_POR_MONTO;
                     }
 
                     // cupón
                     boolean envioGratis = false;
                     if ("PROMO10".equals(cupon)) {
-                        base = base - base * 0.10;
+                        base = base - base * DESCUENTO_CUPON_PROMO10;
                     } else if ("BIENVENIDA".equals(cupon)) {
-                        base = Math.max(0, base - 500);
+                        base = Math.max(0, base - DESCUENTO_CUPON_BIENVENIDA);
                     } else if ("SIN_ENVIO".equals(cupon)) {
                         envioGratis = true;
                     }
@@ -73,29 +98,29 @@ public class PedidoService {
                     // envío
                     double envio;
                     if (envioExpress) {
-                        if (envioGratis || base >= 20000) {
+                        if (envioGratis || base >= UMBRAL_ENVIO_GRATIS) {
                             envio = 0;
                         } else if ("CABA".equals(provincia)) {
-                            envio = 500;
+                            envio = ENVIO_CABA;
                         } else if ("Buenos Aires".equals(provincia)) {
-                            envio = 800;
+                            envio = ENVIO_BUENOS_AIRES;
                         } else {
-                            envio = 1500;
+                            envio = ENVIO_RESTO_DEL_PAIS;
                         }
-                        envio = envio + 1000;
+                        envio = envio + RECARGO_EXPRESS;
                     } else {
-                        if (envioGratis || base >= 20000) {
+                        if (envioGratis || base >= UMBRAL_ENVIO_GRATIS) {
                             envio = 0;
                         } else if ("CABA".equals(provincia)) {
-                            envio = 500;
+                            envio = ENVIO_CABA;
                         } else if ("Buenos Aires".equals(provincia)) {
-                            envio = 800;
+                            envio = ENVIO_BUENOS_AIRES;
                         } else {
-                            envio = 1500;
+                            envio = ENVIO_RESTO_DEL_PAIS;
                         }
                     }
 
-                    total = Math.round((base + envio) * 1.21 * 100) / 100.0;
+                    total = Math.round((base + envio) * FACTOR_IVA * 100) / 100.0;
 
                     // efectos
                     repositorio.guardar(new Pedido(email, items, total));
@@ -106,11 +131,11 @@ public class PedidoService {
                     // }
 
                     try {
-                        if (tipoCliente == 1) {
+                        if (tipoCliente == CLIENTE_REGULAR) {
                             String cuerpo = "Hola" + ". Tu pedido fue confirmado. Total: $"
                                     + String.format(Locale.US, "%.2f", total);
                             notificador.enviar(email, "Pedido confirmado", cuerpo);
-                        } else if (tipoCliente == 2) {
+                        } else if (tipoCliente == CLIENTE_PREMIUM) {
                             String cuerpo = "Hola cliente premium" + ". Tu pedido fue confirmado. Total: $"
                                     + String.format(Locale.US, "%.2f", total);
                             notificador.enviar(email, "Pedido confirmado", cuerpo);
