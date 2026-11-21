@@ -72,6 +72,7 @@ public class PedidoService {
 
         double subtotal = calcularSubtotal(items);
 
+        // TODO: extraer el cálculo del descuento a una clase PoliticaDeDescuento
         // descuento por tipo de cliente
         double base = subtotal;
         if (tipoCliente == CLIENTE_REGULAR) {
