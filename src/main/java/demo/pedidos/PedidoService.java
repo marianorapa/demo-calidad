@@ -16,12 +16,6 @@ public class PedidoService {
     private static final int CLIENTE_PREMIUM = 2;
     private static final int CLIENTE_MAYORISTA = 3;
 
-    private static final double DESCUENTO_PREMIUM = 0.10;
-    private static final double DESCUENTO_MAYORISTA = 0.20;
-
-    private static final double UMBRAL_DESCUENTO_POR_MONTO = 10000;
-    private static final double DESCUENTO_POR_MONTO = 0.05;
-
     private static final double DESCUENTO_CUPON_PROMO10 = 0.10;
     private static final double DESCUENTO_CUPON_BIENVENIDA = 500;
 
@@ -35,6 +29,7 @@ public class PedidoService {
 
     private final RepositorioPedidos repositorio;
     private final NotificadorEmail notificador;
+    private final PoliticaDeDescuento politicaDeDescuento = new PoliticaDeDescuento();
 
     public PedidoService(RepositorioPedidos repositorio, NotificadorEmail notificador) {
         this.repositorio = repositorio;
@@ -72,20 +67,7 @@ public class PedidoService {
 
         double subtotal = calcularSubtotal(items);
 
-        // TODO: extraer el cálculo del descuento a una clase PoliticaDeDescuento
-        // descuento por tipo de cliente
-        double base = subtotal;
-        if (tipoCliente == CLIENTE_REGULAR) {
-            base = subtotal;
-        } else if (tipoCliente == CLIENTE_PREMIUM) {
-            base = subtotal - subtotal * DESCUENTO_PREMIUM;
-        } else {
-            base = subtotal - subtotal * DESCUENTO_MAYORISTA;
-        }
-        // descuento por monto
-        if (base > UMBRAL_DESCUENTO_POR_MONTO) {
-            base = base - base * DESCUENTO_POR_MONTO;
-        }
+        double base = politicaDeDescuento.calcularBase(subtotal, tipoCliente);
 
         // cupón
         boolean envioGratis = false;
