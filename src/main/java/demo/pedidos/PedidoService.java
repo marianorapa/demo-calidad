@@ -70,11 +70,7 @@ public class PedidoService {
             throw new IllegalArgumentException("Tipo de cliente desconocido");
         }
 
-        // subtotal
-        double subtotal = 0;
-        for (ItemPedido item : items) {
-            subtotal = subtotal + item.precioUnitario() * item.cantidad();
-        }
+        double subtotal = calcularSubtotal(items);
 
         // descuento por tipo de cliente
         double base = subtotal;
@@ -100,30 +96,7 @@ public class PedidoService {
             envioGratis = true;
         }
 
-        // envío
-        double envio;
-        if (envioExpress) {
-            if (envioGratis || base >= UMBRAL_ENVIO_GRATIS) {
-                envio = 0;
-            } else if ("CABA".equals(provincia)) {
-                envio = ENVIO_CABA;
-            } else if ("Buenos Aires".equals(provincia)) {
-                envio = ENVIO_BUENOS_AIRES;
-            } else {
-                envio = ENVIO_RESTO_DEL_PAIS;
-            }
-            envio = envio + RECARGO_EXPRESS;
-        } else {
-            if (envioGratis || base >= UMBRAL_ENVIO_GRATIS) {
-                envio = 0;
-            } else if ("CABA".equals(provincia)) {
-                envio = ENVIO_CABA;
-            } else if ("Buenos Aires".equals(provincia)) {
-                envio = ENVIO_BUENOS_AIRES;
-            } else {
-                envio = ENVIO_RESTO_DEL_PAIS;
-            }
-        }
+        double envio = calcularEnvio(base, envioGratis, provincia, envioExpress);
 
         double total = Math.round((base + envio) * FACTOR_IVA * 100) / 100.0;
 
@@ -136,22 +109,51 @@ public class PedidoService {
         // }
 
         try {
-            if (tipoCliente == CLIENTE_REGULAR) {
-                String cuerpo = "Hola" + ". Tu pedido fue confirmado. Total: $"
-                        + String.format(Locale.US, "%.2f", total);
-                notificador.enviar(email, "Pedido confirmado", cuerpo);
-            } else if (tipoCliente == CLIENTE_PREMIUM) {
-                String cuerpo = "Hola cliente premium" + ". Tu pedido fue confirmado. Total: $"
-                        + String.format(Locale.US, "%.2f", total);
-                notificador.enviar(email, "Pedido confirmado", cuerpo);
-            } else {
-                String cuerpo = "Hola cliente mayorista" + ". Tu pedido fue confirmado. Total: $"
-                        + String.format(Locale.US, "%.2f", total);
-                notificador.enviar(email, "Pedido confirmado", cuerpo);
-            }
+            String cuerpo = armarCuerpoMail(tipoCliente, total);
+            notificador.enviar(email, "Pedido confirmado", cuerpo);
         } catch (Exception e) {
         }
         return total;
+    }
+
+    private double calcularSubtotal(List<ItemPedido> items) {
+        double subtotal = 0;
+        for (ItemPedido item : items) {
+            subtotal = subtotal + item.precioUnitario() * item.cantidad();
+        }
+        return subtotal;
+    }
+
+    private double calcularEnvio(double base, boolean envioGratis, String provincia, boolean envioExpress) {
+        double envio = 0;
+        if (!envioGratis && base < UMBRAL_ENVIO_GRATIS) {
+            envio = tarifaPorProvincia(provincia);
+        }
+        if (envioExpress) {
+            envio = envio + RECARGO_EXPRESS;
+        }
+        return envio;
+    }
+
+    private double tarifaPorProvincia(String provincia) {
+        if ("CABA".equals(provincia)) {
+            return ENVIO_CABA;
+        } else if ("Buenos Aires".equals(provincia)) {
+            return ENVIO_BUENOS_AIRES;
+        }
+        return ENVIO_RESTO_DEL_PAIS;
+    }
+
+    private String armarCuerpoMail(int tipoCliente, double total) {
+        String saludo;
+        if (tipoCliente == CLIENTE_REGULAR) {
+            saludo = "Hola";
+        } else if (tipoCliente == CLIENTE_PREMIUM) {
+            saludo = "Hola cliente premium";
+        } else {
+            saludo = "Hola cliente mayorista";
+        }
+        return saludo + ". Tu pedido fue confirmado. Total: $" + String.format(Locale.US, "%.2f", total);
     }
 
     // Código muerto: nadie lo llama.
